@@ -1,0 +1,70 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+## Loading and preprocessing the data
+
+```{r, echo=TRUE}
+setwd("C:/Users/caozhiy/Documents/data/ds5/project1")
+originalData <- read.csv("activity.csv")
+originalData$date <- as.Date(originalData$date)
+```
+## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+library(reshape2)
+summaryByDateMelt <- melt(originalData, id.vars="date", measure.vars="steps", na.rm=FALSE)
+summaryByDateCast <- dcast(summaryByDateMelt, date ~ variable, sum)
+plot(summaryByDateCast$date, summaryByDateCast$steps, type="h", main="Daily Steps", xlab="Date", ylab="Steps per Day", col="red", lwd=8)
+mean(summaryByDateCast$steps, na.rm=TRUE)
+median(summaryByDateCast$steps, na.rm=TRUE)
+```
+
+
+## What is the average daily activity pattern?
+```{r, echo=TRUE}
+summaryByIntervalMelt <- melt(originalData, id.vars="interval", measure.vars="steps", na.rm=TRUE)
+summaryByIntervalCast <- dcast(summaryByIntervalMelt, interval ~ variable, mean)
+plot(summaryByIntervalCast$interval, summaryByIntervalCast$steps, type="l", main="Average Steps in each Interval", xlab="Interval", ylab="Steps", col="blue", lwd=2)
+
+summaryByIntervalCast$interval[which(summaryByIntervalCast$steps == max(summaryByIntervalCast$steps))]
+```
+
+## Imputing missing values
+```{r, echo=TRUE}
+joinedData <- merge(originalData, summaryByIntervalCast, by="interval")
+naIndex <- which(is.na(joinedData$steps.x))
+
+joinedData[naIndex, "steps.x"] <- joinedData[naIndex, "steps.y"]
+
+imPutedData <- joinedData[c("interval", "steps.x", "date")]
+names(imPutedData) <- c("interval", "steps", "date")
+
+impuSumByDateMelt <- melt(imPutedData, id.vars="date", measure.vars="steps", na.rm=FALSE)
+impuSumByDateCast <- dcast(impuSumByDateMelt, date ~ variable, sum)
+
+plot(impuSumByDateCast$date, impuSumByDateCast$steps, type="h", main="Daily Steps with Imputed Data", xlab="Date", ylab="Steps", lwd=5)
+mean(impuSumByDateCast$steps)
+median(impuSumByDateCast$steps, na.rm=TRUE)
+```
+Looks like the both mean and median doesn't change much from previous calculated without imputing.
+
+## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+imPutedData$weekday <- weekdays(imPutedData$date)
+imPutedData$dayType <- ifelse(imPutedData$weekday %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+
+subData <- imPutedData[c("interval", "dayType", "steps")]
+
+dayTypeSummaryMelt <- melt(subData, id=c("interval", "dayType"), na.rm=TRUE, measures.vars="steps")
+dayTypeSummaryCast <- dcast(dayTypeSummaryMelt, interval + dayType ~ variable, mean)
+
+library(ggplot2)
+p <- ggplot(dayTypeSummaryCast, aes(x=interval, y=steps)) + geom_line() + ylab("Number of Steps")
+p <- p + facet_wrap(~ dayType, ncol=1)
+p
+```
+
+
+Looks like the weekend will have average high numbers of steps.
